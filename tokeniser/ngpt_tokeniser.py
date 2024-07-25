@@ -2,7 +2,6 @@ import os
 import re
 from os.path import isfile
 
-import nltk
 from tokenizers import Tokenizer, normalizers
 from tokenizers.decoders import BPEDecoder
 from tokenizers.models import BPE
@@ -14,11 +13,9 @@ from tokenizers.trainers import BpeTrainer
 class NobelGPTTokeniser:
     def __init__(
         self,
-        sentence_tokenised: bool,
         pretrained: str = None,
         data_path: str = None,
     ):
-        self.sentence_tokenised = sentence_tokenised
         if pretrained is None:
             self.__train(data_path)
         else:
@@ -30,8 +27,6 @@ class NobelGPTTokeniser:
         return self.tokeniser
 
     def __train(self, data_path):
-        sentence_tokenised = True
-
         text_path = os.path.join(data_path, "raw_txt")
 
         text_files = [
@@ -55,13 +50,10 @@ class NobelGPTTokeniser:
 
             f.close()
 
-        if sentence_tokenised:
-            full_text = nltk.tokenize.sent_tokenize(full_text, language="polish")
-
         tokeniser = Tokenizer(BPE(unk_token="[UNK]"))
         trainer = BpeTrainer(
             vocab_size=8000,
-            special_tokens=["[UNK]", "[CLS]", "[SEP]", "[PAD]", "[MASK]", "[RAND]"],
+            special_tokens=["[UNK]", "[CLS]", "[SEP]", "[MASK]", "[RAND]"],
         )
 
         tokeniser.normalizer = normalizers.Sequence(

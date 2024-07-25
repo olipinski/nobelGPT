@@ -5,7 +5,7 @@ from lightning import Trainer
 from torch.utils.data import DataLoader, random_split
 
 from datasets import NobelDataset
-from model import NobelGPT
+from model import NobelLLama
 from tokeniser import NobelGPTTokeniser
 
 full_path = os.path.realpath(__file__)

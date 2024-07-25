@@ -1,1 +1,1 @@
-from model.nobelgpt import NobelGPT
+from model.nobelllama import NobelLLama
