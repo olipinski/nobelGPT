@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from model.model_defs import Transformer
 
 
-class NobelGPT(L.LightningModule):
+class NobelLLama(L.LightningModule):
     def __init__(
         self,
         dim=2048,
@@ -38,17 +38,16 @@ class NobelGPT(L.LightningModule):
         )
 
     def forward(self, x):
-        tokens, start_pos, _, _, = x
-        x = self.nobelgpt(tokens, start_pos)
+        tokens, labels, masks = x
+        tokens = tokens.to(device=self.device).long()
+        x = self.nobelgpt(tokens, 0)
         return x
 
     def training_step(self, batch, batch_idx):
-        _, _, labels, mask = batch
+        tokens, labels, _ = batch
+        labels = labels.long()
         pred = self.forward(batch)
-        loss = F.cross_entropy(pred, labels, reduction="none")
-        # Mask out any loss related to padded tokens
-        loss *= mask
-        loss = loss.mean()
+        loss = F.cross_entropy(pred.view(-1, pred.size(-1)), labels.view(-1))
         values = {
             "train_loss": loss,
         }
@@ -56,9 +55,10 @@ class NobelGPT(L.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        _, _, labels = batch
+        _, labels, _ = batch
         pred = self.forward(batch)
-        loss = F.cross_entropy(pred, labels)
+        labels = labels.long()
+        loss = F.cross_entropy(pred.view(-1, pred.size(-1)), labels.view(-1))
         values = {"val_loss": loss}
         self.log_dict(values, prog_bar=True)
 

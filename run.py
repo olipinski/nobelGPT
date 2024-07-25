@@ -16,28 +16,33 @@ splits = [0.8, 0.2]
 max_seq_len = 2048
 
 # This will also train the tokeniser
-# tokeniser = NobelGPTTokeniser(sentence_tokenised=True, data_path=os.path.join(path, "data"))
+# tokeniser = NobelGPTTokeniser(data_path=os.path.join(path, "data"))
 
 # Load trained tokeniser
-tokeniser = NobelGPTTokeniser(
-    sentence_tokenised=True, pretrained=os.path.join(path, "data")
-)
+tokeniser = NobelGPTTokeniser(pretrained=os.path.join(path, "data"))
 
-# Truncation and padding params
-tokeniser.get_tokeniser().enable_padding(
-    pad_id=3, pad_token="[PAD]", pad_to_multiple_of=2, direction="left"
-)
-tokeniser.get_tokeniser().enable_truncation(max_length=max_seq_len)
-
-dataset = NobelDataset(sentence_split=True, tokeniser=tokeniser)
+dataset = NobelDataset(tokeniser=tokeniser.get_tokeniser())
 
 train, val = random_split(dataset=dataset, lengths=splits)
 
-train_loader = DataLoader(train, batch_size=batch_size, shuffle=True)
-val_loader = DataLoader(val, batch_size=batch_size, shuffle=True)
+train_loader = DataLoader(train, batch_size=batch_size, shuffle=True, num_workers=4)
+val_loader = DataLoader(val, batch_size=batch_size, shuffle=False, num_workers=4)
 
-nobelgpt = NobelGPT(max_batch_size=batch_size)
-#nobelgpt = torch.compile(nobelgpt)
+nobelgpt = NobelLLama(
+    dim=2048,
+    n_layers=16,
+    n_heads=8,
+    n_kv_heads=8,
+    vocab_size=8000,
+    multiple_of=128,
+    ffn_dim_multiplier=None,
+    norm_eps=1e-5,
+    rope_theta=500000,
+    use_scaled_rope=False,
+    max_batch_size=batch_size,
+    max_seq_len=max_seq_len,
+)
+nobelgpt = torch.compile(nobelgpt)
 
 trainer = Trainer()
 trainer.fit(nobelgpt, train_loader, val_loader)

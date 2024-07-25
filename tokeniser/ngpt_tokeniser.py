@@ -53,7 +53,7 @@ class NobelGPTTokeniser:
         tokeniser = Tokenizer(BPE(unk_token="[UNK]"))
         trainer = BpeTrainer(
             vocab_size=8000,
-            special_tokens=["[UNK]", "[CLS]", "[SEP]", "[MASK]", "[RAND]"],
+            special_tokens=["[UNK]", "[CLS]", "[SEP]", "[PAD]", "[MASK]", "[RAND]"],
         )
 
         tokeniser.normalizer = normalizers.Sequence(
