@@ -22,8 +22,8 @@ class BookDataset(Dataset):
         max_seq_len: int = 2048,
     ):
         super().__init__()
-        # if tokeniser is None:
-        #     raise ValueError("A tokeniser must be provided.")
+        if tokeniser is None:
+            raise ValueError("A tokeniser must be provided.")
         self.tokeniser = tokeniser
 
         self.tokens = None

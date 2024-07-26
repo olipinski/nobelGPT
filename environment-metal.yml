@@ -16,3 +16,6 @@ dependencies:
       - lightning==2.3.3
       - tokenizers==0.19.1
       - shortuuid
+      - tqdm
+      - tensorboardX
+      - crc32c

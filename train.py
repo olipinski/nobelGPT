@@ -1,16 +1,18 @@
 import os
 import platform
-import time
 
 import shortuuid
 import torch
 from lightning import Trainer
-from lightning.pytorch.callbacks import ModelCheckpoint
+from lightning.pytorch.callbacks import ModelCheckpoint, ModelSummary
+from lightning.pytorch.loggers import TensorBoardLogger
+from lightning.pytorch.strategies import FSDPStrategy
 from tokenizers import Tokenizer
 from torch.utils.data import DataLoader, random_split
 
-from datasets import NobelDataset
+from datasets import BookDataset, NobelDataset
 from models import NobelGPT
+from models.transformer_parts import TransformerBlock
 from utils.file_utils import create_if_not_exist
 from utils.tokeniser_utils import train_tokeniser
 
@@ -26,24 +28,37 @@ n_head = 8
 n_layer = 12
 ffn_multiplier = 4
 dropout = 0.2
+dataset = "nobel"  # or "book"
+scratch_train_tokeniser = False
+model_type = "gpt"  # for now just this model
 # ----------------
 
+# Experiment name
+run_uuid = shortuuid.uuid()[:8]
+exp_name = f"{dataset}_{model_type}_{run_uuid}"
+
+
+# All the paths to be created
+# ----------------
 full_path = os.path.realpath(__file__)
 path = os.path.split(full_path)[0]
 
-log_dir = os.path.join(path, "logs")
-
-run_uuid = shortuuid.uuid()[:8]
-
 # Check whether the specified paths exist or not and create them
+log_dir = os.path.join(path, "logs")
 create_if_not_exist(log_dir)
-create_if_not_exist(os.path.join(log_dir, "lightning_tensorboard"))
-create_if_not_exist(os.path.join(log_dir, "lightning_wandb"))
+tensorboard_dir = os.path.join(log_dir, "lightning_tensorboard")
+create_if_not_exist(tensorboard_dir)
+checkpoint_dir = os.path.join(log_dir, "checkpoints")
+create_if_not_exist(checkpoint_dir)
+weights_dir = os.path.join(log_dir, "weights")
+create_if_not_exist(weights_dir)
 
-# TODO check which dataset to set the path below to
-
-data_path = os.path.join(path, "data")
+create_if_not_exist(os.path.join(path, "data"))
+data_path = os.path.join(path, "data", dataset)
+create_if_not_exist(data_path)
 text_path = os.path.join(data_path, "raw_txt")
+create_if_not_exist(text_path)
+# ----------------
 
 # Check GPU capability for compile
 compile_ok = False
@@ -55,52 +70,95 @@ if torch.cuda.is_available():
         compile_ok = False
 
 # This will train the tokeniser
-# tokeniser = train_tokeniser(data_path=data_path, text_path=text_path,vocab_size=vocab_size)
+if scratch_train_tokeniser:
+    tokeniser = train_tokeniser(
+        data_path=data_path, text_path=text_path, vocab_size=vocab_size
+    )
+else:
+    # Or load trained tokeniser
+    tokeniser = Tokenizer.from_file(os.path.join(data_path, "tokeniser-ngpt.json"))
 
-# Load trained tokeniser
-tokeniser = Tokenizer.from_file(os.path.join(data_path, "tokeniser-ngpt.json"))
-
-# If changing tokensier must delete the processsed folder!!!!!
+# If changing tokeniser must delete the processed folder!
 # IMPORTANT
-dataset = NobelDataset(tokeniser=tokeniser, max_seq_len=max_seq_len)
+if dataset == "nobel":
+    dataset = NobelDataset(tokeniser=tokeniser, max_seq_len=max_seq_len)
+elif dataset == "book":
+    dataset = BookDataset(tokeniser=tokeniser, max_seq_len=max_seq_len)
+else:
+    raise ValueError(f"Dataset {dataset} not supported.")
 
 train, val = random_split(dataset=dataset, lengths=splits)
 
 train_loader = DataLoader(
-    train, batch_size=batch_size, shuffle=True, num_workers=4, drop_last=True
+    train, batch_size=batch_size, shuffle=True, num_workers=32, drop_last=True
 )
 val_loader = DataLoader(
-    val, batch_size=batch_size, shuffle=False, num_workers=4, drop_last=True
+    val, batch_size=batch_size, shuffle=False, num_workers=32, drop_last=True
 )
-
-nobelgpt = NobelGPT(
-    vocab_size=vocab_size,
-    d_embed=1024,
-    d_model=1024,
-    n_head=8,
-    n_layer=12,
-    ffn_multiplier=4,
-    dropout=0.2,
-    max_seq_len=max_seq_len,
-)
-if compile_ok:
-    nobelgpt = torch.compile(nobelgpt)
 
 checkpoint_callback = ModelCheckpoint(
-    dirpath="checkpoints/", save_top_k=2, monitor="val_loss"
+    dirpath=checkpoint_dir,
+    save_top_k=1,
+    monitor="val_loss",
+    save_last="link",
+    mode="min",
+    auto_insert_metric_name=True,
 )
+weights_callback = ModelCheckpoint(
+    dirpath=weights_dir,
+    save_top_k=1,
+    monitor="val_loss",
+    save_weights_only=True,
+    save_last="link",
+    mode="min",
+    auto_insert_metric_name=True,
+)
+summary_callback = ModelSummary(max_depth=5)
+
+tensorboard_logger = TensorBoardLogger(
+    save_dir=tensorboard_dir,
+    name=exp_name,
+)
+
+# Sharded training
+policy = {TransformerBlock}
+strategy = FSDPStrategy(
+    auto_wrap_policy=policy,
+)
+
+precision = "bf16" if torch.cuda.is_bf16_supported() else "16"
 
 trainer = Trainer(
     devices=-1,
-    # strategy=DeepSpeedStrategy(
-    #     stage=3,
-    #     offload_optimizer=True,
-    #     offload_parameters=True,
-    # )
-    strategy="fsdp",
-    callbacks=[checkpoint_callback],
+    strategy=strategy,
+    callbacks=[checkpoint_callback, weights_callback, summary_callback],
+    logger=tensorboard_logger,
     accelerator="gpu",
-    precision=16,
+    precision=precision,
     max_epochs=100,
+    check_val_every_n_epoch=5,
 )
-trainer.fit(nobelgpt, train_loader, val_loader)
+
+# Automatically moves the model to device and with the correct precision
+with trainer.init_module():
+    if model_type == "gpt":
+        model = NobelGPT(
+            vocab_size=vocab_size,
+            d_embed=d_embed,
+            d_model=d_model,
+            n_head=n_head,
+            n_layer=n_layer,
+            ffn_multiplier=ffn_multiplier,
+            dropout=dropout,
+            max_seq_len=max_seq_len,
+        )
+    else:
+        raise ValueError(f"Model {model_type} not supported.")
+
+if compile_ok:
+    model = torch.compile(model)
+
+num_params = sum([p.numel() for p in model.parameters()])
+print(f"expected bf16 memory usage from params: {num_params * 2 / 1e9:.2f} GB")
+
+trainer.fit(model, train_loader, val_loader)
