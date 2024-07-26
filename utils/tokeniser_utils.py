@@ -1,6 +1,4 @@
 import os
-import re
-from os.path import isfile
 
 from tokenizers import Tokenizer, normalizers
 from tokenizers.decoders import BPEDecoder
@@ -17,14 +15,16 @@ def train_tokeniser(
     text_path,
     vocab_size=24000,
     unk_token="[UNK]",
-    special_tokens=["[UNK]", "[CLS]", "[SEP]", "[PAD]", "[MASK]", "[RAND]"],
+    special_tokens=["[UNK]", "[PAD]", "[MASK]", "[RAND]"],
+    progress=False,
 ) -> Tokenizer:
     full_text = process_raw_text(text_path)
 
-    tokeniser = Tokenizer(BPE(unk_token="[UNK]"))
+    tokeniser = Tokenizer(BPE(unk_token=unk_token))
     trainer = BpeTrainer(
-        vocab_size=24000,
-        special_tokens=["[UNK]", "[CLS]", "[SEP]", "[PAD]", "[MASK]", "[RAND]"],
+        show_progress=progress,
+        vocab_size=vocab_size,
+        special_tokens=special_tokens + ["[CLS]", "[SEP]"],
     )
 
     tokeniser.normalizer = normalizers.Sequence(

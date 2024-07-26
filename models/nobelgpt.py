@@ -48,7 +48,7 @@ class NobelGPT(L.LightningModule):
         tokens = tokens.int()
         tokens_embedded = self.token_embedding(tokens)
         position_embedded = self.position_embedding(
-            torch.arange(tokens_embedded.shape[1], device=tokens.device)
+            torch.arange(tokens_embedded.shape[1], device=self.device)
         )
         tokens_processed = tokens_embedded + position_embedded
         out = self.blocks(tokens_processed)
@@ -65,7 +65,7 @@ class NobelGPT(L.LightningModule):
         values = {
             "train_loss": loss,
         }
-        self.log_dict(values, prog_bar=True)
+        self.log_dict(values, prog_bar=True, sync_dist=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -74,7 +74,7 @@ class NobelGPT(L.LightningModule):
         labels = labels.long()
         loss = F.cross_entropy(pred.view(-1, pred.size(-1)), labels.view(-1))
         values = {"val_loss": loss}
-        self.log_dict(values, prog_bar=True)
+        self.log_dict(values, prog_bar=True, sync_dist=True)
 
     def configure_optimizers(self):
         """

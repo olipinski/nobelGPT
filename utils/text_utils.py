@@ -13,7 +13,7 @@ def process_raw_text(text_path: Union[os.PathLike, str]) -> str:
 
     for file in text_files:
         f = open(os.path.join(text_path, file))
-        # remove the top and bottom parts
+        # remove the top and bottom parts for training
         text = f.read()
 
         up_to_word = "\n\n\n"

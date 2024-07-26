@@ -6,6 +6,10 @@ These are reproductions from scratch of the original papers
 
 also andrejs videos rock
 
+## Downloading the datasets
+
+Please be mindful of the wolnelektury bandwidth...
+
 ## Additional Software
 
 https://github.com/aerkalov/ebooklib

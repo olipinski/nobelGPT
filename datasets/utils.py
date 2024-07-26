@@ -4,13 +4,16 @@ from pathlib import Path
 from typing import List, Tuple, Union
 
 import requests
+from tqdm import tqdm
 
 from utils.file_utils import create_if_not_exist
 
 logger = logging.getLogger(__name__)
 
 
-def get_authors_books(authors: Union[List, Tuple], data_dir: Union[Path, str]) -> None:
+def get_authors_books(
+    authors: Union[List, Tuple], data_dir: Union[Path, str], progress=True
+) -> None:
     """
     Get all books for a list of authors.
 
@@ -32,13 +35,15 @@ def get_authors_books(authors: Union[List, Tuple], data_dir: Union[Path, str]) -
     # create_if_not_exist(os.path.join(data_dir, "raw_pdf"))
     # create_if_not_exist(os.path.join(data_dir, "raw_epub"))
 
-    for author in authors:
+    logger.info(f"Finding books for all authors.")
+    for author in tqdm(authors, disable=not progress):
         response = requests.get(api + "authors/" + author + "/books")
         response = response.json()
         for book in response:
             book_hrefs.append(book["href"])
 
-    for book in book_hrefs:
+    logger.info(f"Downloading all txt books.")
+    for book in tqdm(book_hrefs, disable=not progress):
         book_title = book.split("/")[-2]
         response = requests.get(book)
         response = response.json()
@@ -50,7 +55,7 @@ def get_authors_books(authors: Union[List, Tuple], data_dir: Union[Path, str]) -
             logger.debug(f"Downloading book {book_title}.")
             book_text = requests.get(response["txt"])
             with open(fname, "wb") as fd:
-                for chunk in book_text.iter_content(chunk_size=128):
+                for chunk in book_text.iter_content(chunk_size=1024 * 1024):
                     fd.write(chunk)
         elif response["epub"]:
             continue
@@ -71,4 +76,4 @@ def get_authors_books(authors: Union[List, Tuple], data_dir: Union[Path, str]) -
             #     for chunk in book_text.iter_content(chunk_size=128):
             #         fd.write(chunk)
         else:
-            print(f"Cannot get {book_title}. No parsable formats available")
+            logger.debug(f"Cannot get {book_title}. No parsable formats available")

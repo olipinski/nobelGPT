@@ -2,6 +2,7 @@ import logging
 import os
 
 import numpy as np
+import requests
 from tokenizers import Tokenizer
 from torch.utils.data import Dataset
 
@@ -12,7 +13,7 @@ from utils.text_utils import process_raw_text
 logger = logging.getLogger(__name__)
 
 
-class NobelDataset(Dataset):
+class BookDataset(Dataset):
     def __init__(
         self,
         tokeniser: Tokenizer,
@@ -21,7 +22,8 @@ class NobelDataset(Dataset):
         max_seq_len: int = 2048,
     ):
         super().__init__()
-        self.authors = ("henryk-sienkiewicz", "wladyslaw-stanislaw-reymont")
+        # if tokeniser is None:
+        #     raise ValueError("A tokeniser must be provided.")
         self.tokeniser = tokeniser
 
         self.tokens = None
@@ -30,16 +32,22 @@ class NobelDataset(Dataset):
 
         full_path = os.path.realpath(__file__)
         path = os.path.split(os.path.split(full_path)[0])[0]
-        data_path = os.path.join(path, "data", "nobel")
+        data_path = os.path.join(path, "data", "book")
         self.text_path = os.path.join(data_path, "raw_txt")
         self.processed_path = os.path.join(data_path, "tokenised")
         self.tokens_path = os.path.join(self.processed_path, "tokens.npy")
         self.masks_path = os.path.join(self.processed_path, "mask.npy")
 
         if download:
-            get_authors_books(
-                authors=self.authors, data_dir=data_path, progress=progress
-            )
+            api = "https://wolnelektury.pl/api/"
+
+            author_list = requests.get(api + "authors/")
+            author_slugs = []
+            for author in author_list.json():
+                slug = author["slug"]
+                author_slugs.append(slug)
+
+            get_authors_books(authors=author_slugs, data_dir=path, progress=progress)
         else:
             if (
                 not os.path.exists(self.text_path)

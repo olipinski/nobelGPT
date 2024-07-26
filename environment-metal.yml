@@ -15,3 +15,4 @@ dependencies:
       - pytest==8.3.1
       - lightning==2.3.3
       - tokenizers==0.19.1
+      - shortuuid
