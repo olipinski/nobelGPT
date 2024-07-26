@@ -1,6 +1,5 @@
 import os
 
-import torch
 from lightning import Trainer
 from lightning.pytorch.callbacks import ModelCheckpoint
 from tokenizers import Tokenizer
@@ -18,7 +17,7 @@ splits = [0.8, 0.2]
 max_seq_len = 256
 vocab_size = 24000
 
-data_path=os.path.join(path, "data")
+data_path = os.path.join(path, "data")
 text_path = os.path.join(data_path, "raw_txt")
 
 # This will train the tokeniser
@@ -27,7 +26,7 @@ text_path = os.path.join(data_path, "raw_txt")
 # Load trained tokeniser
 tokeniser = Tokenizer.from_file(os.path.join(data_path, "tokeniser-ngpt.json"))
 
-dataset = NobelDataset(tokeniser=tokeniser,max_seq_len=max_seq_len)
+dataset = NobelDataset(tokeniser=tokeniser, max_seq_len=max_seq_len)
 
 train, val = random_split(dataset=dataset, lengths=splits)
 
@@ -44,11 +43,21 @@ nobelgpt = NobelGPT(
     dropout=0.2,
     max_seq_len=max_seq_len,
 )
-#nobelgpt = torch.compile(nobelgpt)
+# nobelgpt = torch.compile(nobelgpt)
 
 checkpoint_callback = ModelCheckpoint(
     dirpath="checkpoints/", save_top_k=2, monitor="val_loss"
 )
 
-trainer = Trainer(callbacks=[checkpoint_callback], accelerator="cpu")
+trainer = Trainer(
+    devices=-1,
+    # strategy=DeepSpeedStrategy(
+    #     stage=3,
+    #     offload_optimizer=True,
+    #     offload_parameters=True,
+    # )
+    strategy="ddp",
+    callbacks=[checkpoint_callback],
+    accelerator="gpu",
+)
 trainer.fit(nobelgpt, train_loader, val_loader)
