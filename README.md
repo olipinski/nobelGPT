@@ -2,6 +2,10 @@
 
 This code is not optimised for fast training. pre-tokenised dataset could be one
 
+These are reproductions from scratch of the original papers
+
+also andrejs videos rock
+
 ## Additional Software
 
 https://github.com/aerkalov/ebooklib

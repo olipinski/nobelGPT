@@ -8,6 +8,7 @@ from torch.utils.data import Dataset
 
 from datasets.utils import get_authors_books
 from utils.file_utils import create_if_not_exist
+from utils.text_utils import process_raw_text
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ class NobelDataset(Dataset):
         self,
         tokeniser: Tokenizer,
         download=False,
-        seq_len: int = 2048,
+        max_seq_len: int = 2048,
     ):
         super().__init__()
         self.authors = ("henryk-sienkiewicz", "wladyslaw-stanislaw-reymont")
@@ -25,7 +26,7 @@ class NobelDataset(Dataset):
 
         self.tokens = None
         self.mask = None
-        self.seq_len = seq_len
+        self.max_seq_len = max_seq_len
 
         full_path = os.path.realpath(__file__)
         path = os.path.split(os.path.split(full_path)[0])[0]
@@ -59,7 +60,7 @@ class NobelDataset(Dataset):
 
         # Divide the dataset based on sequence lengths
         self.dataset_length = int(
-            (len(self.tokens) - (len(self.tokens) % self.seq_len)) / self.seq_len
+            (len(self.tokens) - (len(self.tokens) % self.max_seq_len)) / self.max_seq_len
         )
 
     def __len__(self):
@@ -68,34 +69,13 @@ class NobelDataset(Dataset):
     def __getitem__(self, idx):
         if idx >= self.dataset_length:
             raise IndexError("Dataset index out of range!")
-        tokens = self.tokens[idx * self.seq_len : (idx + 1) * self.seq_len]
-        labels = self.tokens[idx * self.seq_len + 1 : (idx + 1) * self.seq_len + 1]
-        masks = self.mask[idx * self.seq_len : (idx + 1) * self.seq_len]
+        tokens = self.tokens[idx * self.max_seq_len: (idx + 1) * self.max_seq_len]
+        labels = self.tokens[idx * self.max_seq_len + 1: (idx + 1) * self.max_seq_len + 1]
+        masks = self.mask[idx * self.max_seq_len: (idx + 1) * self.max_seq_len]
         return tokens, labels, masks
 
     def __prepare_dataset(self):
-        text_files = [
-            f
-            for f in os.listdir(self.text_path)
-            if os.path.isfile(os.path.join(self.text_path, f))
-        ]
-
-        full_text = ""
-
-        for file in text_files:
-            f = open(os.path.join(self.text_path, file))
-            # remove the top and bottom parts
-            text = f.read()
-
-            up_to_word = "\n\n\n"
-            rx_to_first = r"^.*?{}".format(re.escape(up_to_word))
-
-            res = re.sub(rx_to_first, "", text, flags=re.DOTALL).strip()
-            res = re.sub(r"-----.*", "", res, flags=re.DOTALL).strip()
-
-            full_text += res
-
-            f.close()
+        full_text = process_raw_text(self.text_path)
 
         tokenised = self.tokeniser.encode(full_text)
         create_if_not_exist(self.processed_path)
