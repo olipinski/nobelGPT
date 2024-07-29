@@ -6,9 +6,13 @@ These are reproductions from scratch of the original papers
 
 also andrejs videos rock
 
+If changing tokeniser must delete the processed folder!
+
 ## Downloading the datasets
 
-Please be mindful of the wolnelektury bandwidth...
+Please be mindful of the Wolne Lektury bandwidth...
+
+also should include end of text token probably for the datasets
 
 ## Additional Software
 

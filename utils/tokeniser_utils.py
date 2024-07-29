@@ -1,7 +1,7 @@
 import os
 
 from tokenizers import Tokenizer, normalizers
-from tokenizers.decoders import BPEDecoder
+from tokenizers.decoders import ByteLevel as ByteLevelDecoder
 from tokenizers.models import BPE
 from tokenizers.pre_tokenizers import ByteLevel
 from tokenizers.processors import TemplateProcessing
@@ -44,6 +44,6 @@ def train_tokeniser(
             ("[SEP]", tokeniser.token_to_id("[SEP]")),
         ],
     )
-    tokeniser.decoder = BPEDecoder()
+    tokeniser.decoder = ByteLevelDecoder()
 
     return tokeniser

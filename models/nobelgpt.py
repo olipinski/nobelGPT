@@ -32,6 +32,8 @@ class NobelGPT(L.LightningModule):
         self.ffn_multiplier = ffn_multiplier
         self.dropout = dropout
 
+        self.save_hyperparameters()
+
         # Initialised in configure model
         self.token_embedding = None
         self.position_embedding = None
@@ -68,7 +70,7 @@ class NobelGPT(L.LightningModule):
                 nn.init.constant_(module.bias, 0)
 
     def forward(self, x):
-        tokens, labels, masks = x
+        tokens, _, _ = x
         tokens = tokens.int()
         tokens_embedded = self.token_embedding(tokens)
         position_embedded = self.position_embedding(

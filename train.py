@@ -15,11 +15,12 @@ from models import NobelGPT
 from models.transformer_parts import TransformerBlock
 from utils.file_utils import create_if_not_exist
 from utils.tokeniser_utils import train_tokeniser
+from callbacks import GenerationCallback
 
 # ----------------
 # Parameters
 batch_size = 16
-splits = [0.8, 0.2]
+splits = [0.9, 0.1]
 max_seq_len = 1024
 vocab_size = 24000
 d_embed = 1024
@@ -50,8 +51,6 @@ tensorboard_dir = os.path.join(log_dir, "lightning_tensorboard")
 create_if_not_exist(tensorboard_dir)
 checkpoint_dir = os.path.join(log_dir, "checkpoints")
 create_if_not_exist(checkpoint_dir)
-weights_dir = os.path.join(log_dir, "weights")
-create_if_not_exist(weights_dir)
 
 create_if_not_exist(os.path.join(path, "data"))
 data_path = os.path.join(path, "data", dataset)
@@ -104,16 +103,8 @@ checkpoint_callback = ModelCheckpoint(
     mode="min",
     auto_insert_metric_name=True,
 )
-weights_callback = ModelCheckpoint(
-    dirpath=weights_dir,
-    save_top_k=1,
-    monitor="val_loss",
-    save_weights_only=True,
-    save_last="link",
-    mode="min",
-    auto_insert_metric_name=True,
-)
 summary_callback = ModelSummary(max_depth=5)
+gen_callback = GenerationCallback(generate_every_n_val=1)
 
 tensorboard_logger = TensorBoardLogger(
     save_dir=tensorboard_dir,
@@ -131,7 +122,7 @@ precision = "bf16" if torch.cuda.is_bf16_supported() else "16"
 trainer = Trainer(
     devices=-1,
     strategy=strategy,
-    callbacks=[checkpoint_callback, weights_callback, summary_callback],
+    callbacks=[checkpoint_callback, summary_callback, gen_callback],
     logger=tensorboard_logger,
     accelerator="gpu",
     precision=precision,
@@ -157,8 +148,5 @@ with trainer.init_module():
 
 if compile_ok:
     model = torch.compile(model)
-
-num_params = sum([p.numel() for p in model.parameters()])
-print(f"expected bf16 memory usage from params: {num_params * 2 / 1e9:.2f} GB")
 
 trainer.fit(model, train_loader, val_loader)
