@@ -1,3 +1,4 @@
+"""Text cleanup utils."""
 import os
 import re
 from os.path import isfile

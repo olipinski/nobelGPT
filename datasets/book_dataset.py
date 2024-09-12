@@ -1,3 +1,4 @@
+"""Module containing the book dataset - only Polish books."""
 import logging
 import os
 

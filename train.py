@@ -1,3 +1,4 @@
+"""The main file for training the nobelGPT."""
 import os
 import platform
 
@@ -8,30 +9,32 @@ from lightning.pytorch.callbacks import ModelCheckpoint, ModelSummary
 from lightning.pytorch.loggers import TensorBoardLogger
 from lightning.pytorch.strategies import FSDPStrategy
 from tokenizers import Tokenizer
+from tokenizers.decoders import ByteLevel
 from torch.utils.data import DataLoader, random_split
 
+from callbacks import GenerationCallback
 from datasets import BookDataset, NobelDataset
 from models import NobelGPT
 from models.transformer_parts import TransformerBlock
 from utils.file_utils import create_if_not_exist
 from utils.tokeniser_utils import train_tokeniser
-from callbacks import GenerationCallback
 
 # ----------------
 # Parameters
-batch_size = 16
+batch_size = 64
 splits = [0.9, 0.1]
-max_seq_len = 1024
-vocab_size = 24000
-d_embed = 1024
+max_seq_len = 256
+vocab_size = 32768
+d_embed = 256
 d_model = d_embed
-n_head = 8
-n_layer = 12
+n_head = 4
+n_layer = 4
 ffn_multiplier = 4
-dropout = 0.2
+dropout = 0.1
 dataset = "nobel"  # or "book"
 scratch_train_tokeniser = False
 model_type = "gpt"  # for now just this model
+use_fsdp = True
 # ----------------
 
 # Experiment name
@@ -77,6 +80,8 @@ else:
     # Or load trained tokeniser
     tokeniser = Tokenizer.from_file(os.path.join(data_path, "tokeniser-ngpt.json"))
 
+tokeniser.decoder = ByteLevel()
+
 # If changing tokeniser must delete the processed folder!
 # IMPORTANT
 if dataset == "nobel":
@@ -89,10 +94,18 @@ else:
 train, val = random_split(dataset=dataset, lengths=splits)
 
 train_loader = DataLoader(
-    train, batch_size=batch_size, shuffle=True, num_workers=32, drop_last=True
+    train,
+    batch_size=batch_size,
+    shuffle=False,
+    num_workers=os.cpu_count(),
+    drop_last=True,
 )
 val_loader = DataLoader(
-    val, batch_size=batch_size, shuffle=False, num_workers=32, drop_last=True
+    val,
+    batch_size=batch_size,
+    shuffle=False,
+    num_workers=os.cpu_count(),
+    drop_last=True,
 )
 
 checkpoint_callback = ModelCheckpoint(
@@ -104,7 +117,7 @@ checkpoint_callback = ModelCheckpoint(
     auto_insert_metric_name=True,
 )
 summary_callback = ModelSummary(max_depth=5)
-gen_callback = GenerationCallback(generate_every_n_val=1)
+gen_callback = GenerationCallback(generate_every_n_val=1, tokeniser=tokeniser)
 
 tensorboard_logger = TensorBoardLogger(
     save_dir=tensorboard_dir,
@@ -117,15 +130,14 @@ strategy = FSDPStrategy(
     auto_wrap_policy=policy,
 )
 
-precision = "bf16" if torch.cuda.is_bf16_supported() else "16"
+torch.set_float32_matmul_precision("high")
 
 trainer = Trainer(
     devices=-1,
-    strategy=strategy,
+    strategy=strategy if use_fsdp else "auto",
     callbacks=[checkpoint_callback, summary_callback, gen_callback],
     logger=tensorboard_logger,
     accelerator="gpu",
-    precision=precision,
     max_epochs=100,
     check_val_every_n_epoch=5,
 )

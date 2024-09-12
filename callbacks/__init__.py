@@ -1,1 +1,2 @@
-from generate_callback import GenerationCallback
+"""Import callbacks."""
+from .generate_callback import GenerationCallback

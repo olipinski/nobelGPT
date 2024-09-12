@@ -1,15 +1,15 @@
+"""The main file for generating text using the trained nobelGPT model."""
+
 import os
 from os.path import isfile
 
 import torch
-from tinycss2 import tokenizer
+import torch.nn.functional as F
 from tokenizers import Tokenizer
 from tokenizers.decoders import ByteLevel
 
 from models import NobelGPT
 from utils.file_utils import create_if_not_exist
-import torch.nn.functional as F
-
 
 # ----------------
 # Parameters
@@ -57,8 +57,6 @@ model = NobelGPT.load_from_checkpoint(
 )
 
 model.eval()
-# model.freeze()
-
 
 print(
     "Evaluating model, please input prompts below. If you would like to stop use Ctrl-C."
@@ -71,10 +69,10 @@ while True:
     for _ in range(tokens_to_gen):
         logits = model((tokens, 0, 0))
         logits = logits[:, -1, :]
-        probs = F.softmax(logits, dim =-1)
-        top_probs, top_idx = torch.topk(probs, 5) # only get the indices
+        probs = F.softmax(logits, dim=-1)
+        top_probs, top_idx = torch.topk(probs, 5)  # only get the indices
         choice_idx = torch.multinomial(top_probs, num_samples=1)
-        next_token = top_idx[0,choice_idx]
+        next_token = top_idx[0, choice_idx]
         tokens = torch.cat([tokens, next_token], dim=-1)
 
     decoded = tokeniser.decode(tokens.squeeze().tolist())

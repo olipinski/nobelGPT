@@ -1,3 +1,4 @@
+"""Module containing the Nobel dataset - only Polish nobel laurates."""
 import logging
 import os
 

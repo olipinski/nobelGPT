@@ -7,4 +7,5 @@ __pycache__/
 # PyCharm
 .idea/
 
-data/
+data
+logs

@@ -1,3 +1,4 @@
+"""Utils for managing the datasets."""
 import logging
 import os
 from pathlib import Path
@@ -35,14 +36,14 @@ def get_authors_books(
     # create_if_not_exist(os.path.join(data_dir, "raw_pdf"))
     # create_if_not_exist(os.path.join(data_dir, "raw_epub"))
 
-    logger.info(f"Finding books for all authors.")
+    logger.info("Finding books for all authors.")
     for author in tqdm(authors, disable=not progress):
         response = requests.get(api + "authors/" + author + "/books")
         response = response.json()
         for book in response:
             book_hrefs.append(book["href"])
 
-    logger.info(f"Downloading all txt books.")
+    logger.info("Downloading all txt books.")
     for book in tqdm(book_hrefs, disable=not progress):
         book_title = book.split("/")[-2]
         response = requests.get(book)
